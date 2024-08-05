@@ -14,6 +14,23 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
     "D:/Thapar/Sem 7/Capstone Project/Py Project/geospatial-creator-tutorial-5e7bba045c2f.json"
 )
 
+# List of Indian languages and their language codes
+languages = {
+    "Hindi": "hi",
+    "Bengali": "bn",
+    "Telugu": "te",
+    "Marathi": "mr",
+    "Tamil": "ta",
+    "Gujarati": "gu",
+    "Kannada": "kn",
+    "Malayalam": "ml",
+    "Odia": "or",
+    "Punjabi": "pa",
+    "Assamese": "as",
+    "Maithili": "mai",
+    "Urdu": "ur",
+}
+
 
 def upload_pdf():
     file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
@@ -75,6 +92,15 @@ def save_translated_pdf():
 root = tk.Tk()
 root.title("PDF Form Translator")
 
+language_label = tk.Label(root, text="Select Target Language: ")
+language_label.pack()
+
+target_language = tk.StringVar()
+target_language.set("hi")  # Default to Hindi
+
+language_menu = tk.OptionMenu(root, target_language, *languages.values())
+language_menu.pack()
+
 upload_button = tk.Button(root, text="Upload PDF", command=upload_pdf)
 upload_button.pack()
 
@@ -86,8 +112,5 @@ translated_text_box.pack(expand=1, fill="both")
 
 save_button = tk.Button(root, text="Save Translated PDF", command=save_translated_pdf)
 save_button.pack()
-
-target_language = tk.StringVar()
-target_language.set("hi")  # Default to Hindi
 
 root.mainloop()
