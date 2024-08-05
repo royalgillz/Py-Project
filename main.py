@@ -34,6 +34,10 @@ languages = {
 # Initialize PaddleOCR
 ocr = PaddleOCR(use_angle_cls=True, lang="en")
 
+# Flag to prevent recursive updates
+updating_original = False
+updating_translated = False
+
 
 def upload_pdf():
     file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
@@ -51,17 +55,28 @@ def extract_text_from_pdf(file_path):
             result = ocr.ocr(image_path, cls=True)
             page_text = ""
             for line in result[0]:
-                # Append text with original spaces and layout
                 page_text += line[1][0] + "\n"
             texts.append(page_text)
         display_text("\n".join(texts))
 
 
 def display_text(text):
+    global updating_original
+    updating_original = True
     text_box.delete("1.0", tk.END)
     text_box.insert(tk.END, text)
-    translated_text = translate_text(text, target_language.get())
-    display_translated_text(translated_text)
+    translate_text_and_update()
+    updating_original = False
+
+
+def translate_text_and_update():
+    global updating_translated
+    text = text_box.get("1.0", tk.END).strip()
+    if text:
+        translated_text = translate_text(text, target_language.get())
+        updating_translated = True
+        display_translated_text(translated_text)
+        updating_translated = False
 
 
 def translate_text(text, target_language):
@@ -70,15 +85,16 @@ def translate_text(text, target_language):
         text, target_language=languages[target_language]
     )
     translated_text = result["translatedText"]
-
-    # Ensure that whitespace is preserved in the translated text
-    translated_text = translated_text.replace("\r\n", "\n").replace("\n", "\n")
     return translated_text
 
 
-def sync_entries(english_text, translated_text):
-    # Logic to synchronize form entries goes here
-    pass
+def sync_entries(event):
+    global updating_original, updating_translated
+    if event.widget == text_box and not updating_original:
+        translate_text_and_update()
+    elif event.widget == translated_text_box and not updating_translated:
+        # Optional: Update original text from translated text if needed
+        pass
 
 
 def generate_pdf(text, output_path):
@@ -86,18 +102,20 @@ def generate_pdf(text, output_path):
     lines = text.split("\n")
     y = 750
     for line in lines:
-        # Adjust line drawing to accommodate text wrapping and whitespace
         c.drawString(100, y, line)
         y -= 15
-        if y < 50:  # Adjust this if necessary based on page layout
+        if y < 50:
             c.showPage()
             y = 750
     c.save()
 
 
 def display_translated_text(text):
+    global updating_translated
+    updating_translated = True
     translated_text_box.delete("1.0", tk.END)
     translated_text_box.insert(tk.END, text)
+    updating_translated = False
 
 
 def save_translated_pdf():
@@ -138,6 +156,9 @@ paned_window.pack(expand=True, fill="both", pady=5)
 
 text_box = tk.Text(paned_window, wrap="word", relief="solid", bd=1)
 translated_text_box = tk.Text(paned_window, wrap="word", relief="solid", bd=1)
+
+text_box.bind("<KeyRelease>", sync_entries)
+translated_text_box.bind("<KeyRelease>", sync_entries)
 
 paned_window.add(text_box, weight=1)
 paned_window.add(translated_text_box, weight=1)
