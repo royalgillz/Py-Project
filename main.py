@@ -8,6 +8,8 @@ import PyPDF2
 from google.cloud import translate_v2 as translate
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import textwrap
+from tkinter import ttk
 
 # Set the environment variable for Google Cloud credentials
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
@@ -60,8 +62,14 @@ def extract_text_from_image(image_path):
 
 def translate_text(text, target_language):
     translate_client = translate.Client()
-    result = translate_client.translate(text, target_language=target_language)
-    return result["translatedText"]
+    result = translate_client.translate(
+        text, target_language=languages[target_language]
+    )
+    translated_text = result["translatedText"]
+
+    # Wrap translated text to preserve formatting
+    wrapped_text = textwrap.fill(translated_text, width=80, replace_whitespace=False)
+    return wrapped_text
 
 
 def sync_entries(english_text, translated_text):
@@ -71,7 +79,11 @@ def sync_entries(english_text, translated_text):
 
 def generate_pdf(text, output_path):
     c = canvas.Canvas(output_path, pagesize=letter)
-    c.drawString(100, 750, text)
+    lines = text.split("\n")
+    y = 750
+    for line in lines:
+        c.drawString(100, y, line)
+        y -= 15
     c.save()
 
 
@@ -92,25 +104,37 @@ def save_translated_pdf():
 root = tk.Tk()
 root.title("PDF Form Translator")
 
-language_label = tk.Label(root, text="Select Target Language: ")
-language_label.pack()
+# Apply a modern theme
+style = ttk.Style(root)
+style.theme_use("clam")
+
+# Add padding and modernize the widgets
+frame = ttk.Frame(root, padding="10")
+frame.pack(expand=True, fill="both")
+
+language_label = ttk.Label(frame, text="Select Target Language:")
+language_label.pack(pady=5)
 
 target_language = tk.StringVar()
-target_language.set("hi")  # Default to Hindi
+target_language.set("Hindi")  # Default to Hindi
 
-language_menu = tk.OptionMenu(root, target_language, *languages.values())
-language_menu.pack()
+language_menu = ttk.OptionMenu(frame, target_language, *languages.keys())
+language_menu.pack(pady=5)
 
-upload_button = tk.Button(root, text="Upload PDF", command=upload_pdf)
-upload_button.pack()
+upload_button = ttk.Button(frame, text="Upload PDF", command=upload_pdf)
+upload_button.pack(pady=5)
 
-text_box = tk.Text(root, wrap="word")
-text_box.pack(expand=1, fill="both")
+# Create a PanedWindow to hold the text boxes side by side
+paned_window = ttk.PanedWindow(frame, orient=tk.HORIZONTAL)
+paned_window.pack(expand=True, fill="both", pady=5)
 
-translated_text_box = tk.Text(root, wrap="word")
-translated_text_box.pack(expand=1, fill="both")
+text_box = tk.Text(paned_window, wrap="word", relief="solid", bd=1)
+translated_text_box = tk.Text(paned_window, wrap="word", relief="solid", bd=1)
 
-save_button = tk.Button(root, text="Save Translated PDF", command=save_translated_pdf)
-save_button.pack()
+paned_window.add(text_box, weight=1)
+paned_window.add(translated_text_box, weight=1)
+
+save_button = ttk.Button(frame, text="Save Translated PDF", command=save_translated_pdf)
+save_button.pack(pady=5)
 
 root.mainloop()
