@@ -1,14 +1,12 @@
 import os
 import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox
-from PIL import Image, ImageTk
-import pytesseract
-import PyPDF2
+from tkinter import filedialog, messagebox
+from PIL import Image
+from paddleocr import PaddleOCR
+import pdfplumber
 from google.cloud import translate_v2 as translate
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-import textwrap
 from tkinter import ttk
 
 # Set the environment variable for Google Cloud credentials
@@ -33,6 +31,9 @@ languages = {
     "Urdu": "ur",
 }
 
+# Initialize PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang="en")
+
 
 def upload_pdf():
     file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
@@ -41,12 +42,19 @@ def upload_pdf():
 
 
 def extract_text_from_pdf(file_path):
-    with open(file_path, "rb") as file:
-        reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page_num in range(len(reader.pages)):
-            text += reader.pages[page_num].extract_text()
-        display_text(text)
+    with pdfplumber.open(file_path) as pdf:
+        texts = []
+        for page in pdf.pages:
+            image = page.to_image(resolution=300)
+            image_path = "temp.png"
+            image.save(image_path)
+            result = ocr.ocr(image_path, cls=True)
+            page_text = ""
+            for line in result[0]:
+                # Append text with original spaces and layout
+                page_text += line[1][0] + "\n"
+            texts.append(page_text)
+        display_text("\n".join(texts))
 
 
 def display_text(text):
@@ -56,10 +64,6 @@ def display_text(text):
     display_translated_text(translated_text)
 
 
-def extract_text_from_image(image_path):
-    return pytesseract.image_to_string(Image.open(image_path))
-
-
 def translate_text(text, target_language):
     translate_client = translate.Client()
     result = translate_client.translate(
@@ -67,9 +71,9 @@ def translate_text(text, target_language):
     )
     translated_text = result["translatedText"]
 
-    # Wrap translated text to preserve formatting
-    wrapped_text = textwrap.fill(translated_text, width=80, replace_whitespace=False)
-    return wrapped_text
+    # Ensure that whitespace is preserved in the translated text
+    translated_text = translated_text.replace("\r\n", "\n").replace("\n", "\n")
+    return translated_text
 
 
 def sync_entries(english_text, translated_text):
@@ -82,8 +86,12 @@ def generate_pdf(text, output_path):
     lines = text.split("\n")
     y = 750
     for line in lines:
+        # Adjust line drawing to accommodate text wrapping and whitespace
         c.drawString(100, y, line)
         y -= 15
+        if y < 50:  # Adjust this if necessary based on page layout
+            c.showPage()
+            y = 750
     c.save()
 
 
